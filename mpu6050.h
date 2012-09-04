@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Regents of the University of California
+ * Copyright (c) 2010, Regents of the University of California
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,50 +27,70 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *
- * Generalized integer PID module
+ * InvenSense MPU-6050 6-axis MEMS Driver
  *
- * by Andrew Pullin
+ * by Humphrey Hu
+ * based on ITG-3200 Driver by Stanley S. Baek
  *
- * v.0.1
+ * Notes:
+ *  - Uses an I2C port for communicating with the mpuscope chip
+ *
+ * Usage:
+ *  #include  "mpu.h"
+ *
+ *  float mpuData[3];
+ *  unsigned char * mpuStrData;
+ *
+ *  // initialize mpu module
+ *  mpuSetup();
+ * 
+ *  // run calibration with 1000 samples
+ *  mpuRunCalib(1000)
+ *
+ *  // read out data from mpuscope and save in an internal buffer
+ *  mpuReadXYZ();
+ *
+ *  // convert data into floating point values in deg/s
+ *  mpuGetDegXYZ(mpuData);
+ *  // mpuGetRadXYZ(mpuData);  // in radian/s  
+ *
+ *  // read the data in raw string format
+ *  // mpuStrData[0] = lower byte of x-axis data
+ *  // mpuStrData[1] = higher byte of x-axis data
+ *  // mpuStrData[2] = lower byte of y-axis data
+ *  // ...
+ *  // mpuStrData[5] = higher byte of z-axis data
+ *
+ *  mpuStrData = mpuGetsXYZ();
  */
 
-#ifndef __PID_H
-#define __PID_H
+#ifndef __MPU_H
+#define __MPU_H
 
-//DSP dependent include
-#ifdef PID_HARDWARE
-#include <dsp.h>
+// Setup device
+void mpuSetup(void);
+
+// Run calibration routine
+void mpuRunCalib(unsigned int count);
+
+// Set sleep mode
+void mpuSetSleep(unsigned char mode);
+
+// 3 ints
+void mpuGetGyro(int* buff);
+// 3 ints
+void mpuGetXl(int* buff);
+// 1 int
+void mpuGetTemp(int* buff);
+
+float mpuGetGyroScale(void);
+float mpuGetXlScale(void);
+float mpuGetTempScale(void);
+
+// Read data from MPU
+void mpuUpdate(void);
+
 #endif
 
-#define PID_ON  1
-#define PID_OFF 0
 
-//Structures and enums
-//PID Continer structure
 
-typedef struct {
-    int input;
-    long dState, iState, preSat, p, i, d;
-    int Kp, Ki, Kd, Kaw, y_old, output;
-    unsigned char N;
-    char onoff; //boolean
-    long error;
-    unsigned long run_time;
-    unsigned long start_time;
-    int inputOffset;
-    int Kff;
-    int maxVal, minVal;
-    int satValPos, satValNeg;
-#ifdef PID_HARDWARE
-    tPID dspPID;
-#endif
-} pidObj;
-
-//Functions
-void pidUpdate(pidObj *pid, int y);
-void pidInitPIDObj(pidObj *pid, int Kp, int Ki, int Kd, int Kaw, int ff);
-void pidSetInput(pidObj *pid, int feedback);
-void pidSetGains(pidObj *pid, int Kp, int Ki, int Kd, int Kaw, int ff);
-void pidOnOff(pidObj *pid, unsigned char state);
-
-#endif // __PID_H
