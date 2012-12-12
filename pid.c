@@ -45,6 +45,7 @@
 #include "pid.h"
 #include "pid_hw.h"
 #include <stdlib.h> // for malloc
+#include "tail_ctrl.h"
 
 
 #define ABS(my_val) ((my_val) < 0) ? -(my_val) : (my_val)
@@ -88,6 +89,63 @@ void pidUpdate(pidObj *pid, int feedback) {
 
 #elif defined PID_HARDWARE
     pid->dspPID.controlReference = pid->input;
+    pid->preSat = pidHWRun(&(pid->dspPID), feedback); //Do PID calculate via DSP lib
+#endif
+
+    //Feedforward term
+    long fftemp = (long)(pid->Kff)*(long)(pid->input);
+    fftemp = fftemp / (long)FF_SCALER;
+    pid->preSat += fftemp;
+
+    if (pid->preSat  >  pid->satValPos) {
+        pid->output = pid->satValPos;
+    }
+    else if (pid->preSat  <  pid->satValNeg) {
+        pid->output = pid->satValNeg;
+    }
+    else {
+        pid->output = pid->preSat;
+    }
+}
+
+void pidUpdateRotary(pidObj *pid, int feedback) {
+    pid->error = pid->input - feedback;
+    int inputTemp = pid->input;
+    if (pid->error > (180*10)*TAIL_PID_SCALER){
+            pid->error = pid->error - (360*10)*TAIL_PID_SCALER;
+            pid->input = 0;
+            feedback = -pid->error;
+    }
+
+    else if (pid->error < (-180*10)*TAIL_PID_SCALER){
+            pid->error = pid->error + (360*10)*TAIL_PID_SCALER;
+            pid->input = 0;
+            feedback = -pid->error;
+    }
+
+
+
+#ifdef PID_SOFTWARE
+    pid->p = (long) pid->Kp * pid->error;
+    pid->i = (long) pid->Ki * pid->iState;
+    //Filtered derivative action applied directly to measurement
+    pid->d = ((long) pid->Kd * (long) pid->d * (long) SOFT_GAIN_SCALER) /
+             ((long) pid->Kd + (long) pid->Kp * (long) pid->N) -
+             ((long) pid->Kd * (long) pid->Kp * (long) pid->N *
+             ((long) feedback - (long) pid->y_old)) / ((long) pid->Kd +
+             (long) pid->Kp * (long) pid->N);
+
+    pid->preSat = ((pid->p + pid->i + pid->d) * (long) pid->maxVal) /
+            ((long) SOFT_GAIN_SCALER * (long)(pid->inputOffset));
+
+    pid->iState += (long)(pid->error) + (long) (pid->Kaw) *
+                   ((long) (pid->output) - (long) (pid->preSat)) /
+                   ((long) SOFT_GAIN_SCALER);
+    pid->y_old = feedback;
+
+#elif defined PID_HARDWARE
+    pid->dspPID.controlReference = pid->input;
+    pid->input = inputTemp;
     pid->preSat = pidHWRun(&(pid->dspPID), feedback); //Do PID calculate via DSP lib
 #endif
 

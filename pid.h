@@ -68,6 +68,7 @@ typedef struct {
 
 //Functions
 void pidUpdate(pidObj *pid, int y);
+void pidUpdateRotary(pidObj *pid, int y);
 void pidInitPIDObj(pidObj *pid, int Kp, int Ki, int Kd, int Kaw, int ff);
 void pidSetInput(pidObj *pid, int feedback);
 void pidSetGains(pidObj *pid, int Kp, int Ki, int Kd, int Kaw, int ff);
